@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+
+{% block title %}Invoices - Tutoring Invoicing{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Invoices</h2>
+    <button class="btn btn-primary" onclick="openInvoiceModal()">Create Invoice</button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="filter-bar">
+            <input type="text" id="invoice-search" class="form-control" placeholder="Search invoices...">
+            <select id="status-filter" class="form-control">
+                <option value="">All Statuses</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="paid">Paid</option>
+            </select>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Student</th>
+                        <th>Issue Date</th>
+                        <th>Due Date</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="invoices-table">
+                    <tr>
+                        <td colspan="7" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Invoice Modal -->
+<div id="invoice-modal" class="modal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3>Create Invoice</h3>
+            <button class="close-btn" onclick="closeInvoiceModal()">&times;</button>
+        </div>
+        <form id="invoice-form" onsubmit="saveInvoice(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="invoice-student">Student *</label>
+                    <select id="invoice-student" class="form-control" required onchange="loadUnbilledSessions()">
+                        <option value="">Select a student</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="invoice-issue-date">Issue Date *</label>
+                        <input type="date" id="invoice-issue-date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="invoice-due-date">Due Date *</label>
+                        <input type="date" id="invoice-due-date" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Unbilled Sessions</label>
+                    <div id="unbilled-sessions" class="sessions-list">
+                        <p class="text-muted">Select a student to view unbilled sessions</p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="invoice-notes">Notes</label>
+                    <textarea id="invoice-notes" class="form-control" rows="3"></textarea>
+                </div>
+
+                <div class="invoice-summary">
+                    <table>
+                        <tr>
+                            <td>Subtotal:</td>
+                            <td id="invoice-subtotal">NZD $0.00</td>
+                        </tr>
+                        <tr>
+                            <td>Tax (GST 15%):</td>
+                            <td id="invoice-tax">NZD $0.00</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td><strong>Total:</strong></td>
+                            <td><strong id="invoice-total">NZD $0.00</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeInvoiceModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Invoice</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Invoice View Modal -->
+<div id="view-invoice-modal" class="modal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3 id="view-invoice-number">Invoice</h3>
+            <button class="close-btn" onclick="closeViewInvoiceModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="invoice-view-content">
+            Loading...
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="closeViewInvoiceModal()">Close</button>
+            <button type="button" class="btn btn-success" id="mark-paid-btn" onclick="markAsPaid()">Mark as Paid</button>
+            <button type="button" class="btn btn-primary" id="download-pdf-btn" onclick="downloadPDF()">Download PDF</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let invoices = [];
+let students = [];
+let selectedSessions = [];
+let currentInvoiceId = null;
+
+async function loadInvoices() {
+    try {
+        const [invoicesRes, studentsRes] = await Promise.all([
+            fetch('/api/invoices'),
+            fetch('/api/students')
+        ]);
+
+        invoices = await invoicesRes.json();
+        students = await studentsRes.json();
+
+        populateStudentSelect();
+        renderInvoices(invoices);
+    } catch (error) {
+        console.error('Error loading invoices:', error);
+        showToast('Failed to load invoices', 'error');
+    }
+}
+
+function populateStudentSelect() {
+    const select = document.getElementById('invoice-student');
+    select.innerHTML = '<option value="">Select a student</option>' +
+        students.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+}
+
+function renderInvoices(invoiceList) {
+    const tbody = document.getElementById('invoices-table');
+    if (invoiceList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No invoices found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = invoiceList.map(invoice => {
+        const statusClass = invoice.status === 'paid' ? 'badge-success' : 'badge-warning';
+        return `
+            <tr>
+                <td><strong>${escapeHtml(invoice.invoice_number)}</strong></td>
+                <td>${escapeHtml(invoice.student_name)}</td>
+                <td>${formatDate(invoice.issue_date)}</td>
+                <td>${formatDate(invoice.due_date)}</td>
+                <td>NZD $${invoice.total_amount.toFixed(2)}</td>
+                <td><span class="badge ${statusClass}">${invoice.status.toUpperCase()}</span></td>
+                <td>
+                    <button class="btn btn-sm" onclick="viewInvoice(${invoice.id})">View</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteInvoice(${invoice.id})">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openInvoiceModal() {
+    const modal = document.getElementById('invoice-modal');
+    document.getElementById('invoice-form').reset();
+
+    // Set default dates
+    const today = new Date().toISOString().split('T')[0];
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 14);
+
+    document.getElementById('invoice-issue-date').value = today;
+    document.getElementById('invoice-due-date').value = dueDate.toISOString().split('T')[0];
+
+    selectedSessions = [];
+    updateInvoiceTotals();
+
+    modal.style.display = 'block';
+}
+
+function closeInvoiceModal() {
+    document.getElementById('invoice-modal').style.display = 'none';
+}
+
+async function loadUnbilledSessions() {
+    const studentId = document.getElementById('invoice-student').value;
+    if (!studentId) {
+        document.getElementById('unbilled-sessions').innerHTML =
+            '<p class="text-muted">Select a student to view unbilled sessions</p>';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/sessions/unbilled');
+        const allSessions = await response.json();
+        const studentSessions = allSessions.filter(s => s.student_id === parseInt(studentId));
+
+        if (studentSessions.length === 0) {
+            document.getElementById('unbilled-sessions').innerHTML =
+                '<p class="text-muted">No unbilled sessions for this student</p>';
+            return;
+        }
+
+        document.getElementById('unbilled-sessions').innerHTML = studentSessions.map(session => {
+            const amount = session.duration * session.hourly_rate;
+            return `
+                <div class="session-item">
+                    <input type="checkbox" id="session-${session.id}" value="${session.id}"
+                           data-amount="${amount}" onchange="toggleSession(${session.id})">
+                    <label for="session-${session.id}">
+                        ${formatDate(session.session_date)} - ${escapeHtml(session.subject || 'Tutoring')}
+                        (${session.duration}hrs @ NZD $${session.hourly_rate.toFixed(2)}) =
+                        <strong>NZD $${amount.toFixed(2)}</strong>
+                    </label>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading unbilled sessions:', error);
+        showToast('Failed to load unbilled sessions', 'error');
+    }
+}
+
+function toggleSession(sessionId) {
+    const checkbox = document.getElementById(`session-${sessionId}`);
+    if (checkbox.checked) {
+        selectedSessions.push(sessionId);
+    } else {
+        selectedSessions = selectedSessions.filter(id => id !== sessionId);
+    }
+    updateInvoiceTotals();
+}
+
+function updateInvoiceTotals() {
+    let subtotal = 0;
+    selectedSessions.forEach(sessionId => {
+        const checkbox = document.getElementById(`session-${sessionId}`);
+        if (checkbox) {
+            subtotal += parseFloat(checkbox.dataset.amount);
+        }
+    });
+
+    const tax = subtotal * 0.15; // 15% GST
+    const total = subtotal + tax;
+
+    document.getElementById('invoice-subtotal').textContent = `NZD $${subtotal.toFixed(2)}`;
+    document.getElementById('invoice-tax').textContent = `NZD $${tax.toFixed(2)}`;
+    document.getElementById('invoice-total').textContent = `NZD $${total.toFixed(2)}`;
+}
+
+async function saveInvoice(event) {
+    event.preventDefault();
+
+    if (selectedSessions.length === 0) {
+        showToast('Please select at least one session', 'error');
+        return;
+    }
+
+    const subtotal = parseFloat(document.getElementById('invoice-subtotal').textContent.replace('NZD $', ''));
+
+    const invoiceData = {
+        student_id: parseInt(document.getElementById('invoice-student').value),
+        issue_date: document.getElementById('invoice-issue-date').value,
+        due_date: document.getElementById('invoice-due-date').value,
+        subtotal: subtotal,
+        notes: document.getElementById('invoice-notes').value,
+        session_ids: selectedSessions
+    };
+
+    try {
+        const response = await fetch('/api/invoices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(invoiceData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast('Invoice created successfully', 'success');
+            closeInvoiceModal();
+            loadInvoices();
+        } else {
+            showToast('Failed to create invoice', 'error');
+        }
+    } catch (error) {
+        console.error('Error creating invoice:', error);
+        showToast('Failed to create invoice', 'error');
+    }
+}
+
+async function viewInvoice(invoiceId) {
+    currentInvoiceId = invoiceId;
+    try {
+        const response = await fetch(`/api/invoices/${invoiceId}`);
+        const data = await response.json();
+
+        document.getElementById('view-invoice-number').textContent = data.invoice.invoice_number;
+
+        let content = `
+            <div class="invoice-details">
+                <div class="invoice-header-info">
+                    <div>
+                        <h4>${escapeHtml(data.settings.business_name)}</h4>
+                        <p>${escapeHtml(data.settings.business_address).replace(/\n/g, '<br>')}</p>
+                        <p>Email: ${escapeHtml(data.settings.business_email)}</p>
+                        <p>Phone: ${escapeHtml(data.settings.business_phone)}</p>
+                    </div>
+                    <div>
+                        <p><strong>Issue Date:</strong> ${formatDate(data.invoice.issue_date)}</p>
+                        <p><strong>Due Date:</strong> ${formatDate(data.invoice.due_date)}</p>
+                        <p><strong>Status:</strong> <span class="badge ${data.invoice.status === 'paid' ? 'badge-success' : 'badge-warning'}">${data.invoice.status.toUpperCase()}</span></p>
+                        ${data.invoice.payment_date ? `<p><strong>Paid On:</strong> ${formatDate(data.invoice.payment_date)}</p>` : ''}
+                    </div>
+                </div>
+
+                <div class="bill-to">
+                    <h4>Bill To:</h4>
+                    <p><strong>${escapeHtml(data.invoice.student_name)}</strong></p>
+                    ${data.invoice.student_email ? `<p>${escapeHtml(data.invoice.student_email)}</p>` : ''}
+                    ${data.invoice.student_phone ? `<p>${escapeHtml(data.invoice.student_phone)}</p>` : ''}
+                    ${data.invoice.student_address ? `<p>${escapeHtml(data.invoice.student_address)}</p>` : ''}
+                </div>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Duration</th>
+                            <th>Rate</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.sessions.map(session => {
+                            const amount = session.duration * session.hourly_rate;
+                            return `
+                                <tr>
+                                    <td>${formatDate(session.session_date)}</td>
+                                    <td>${escapeHtml(session.subject || 'Tutoring Session')}</td>
+                                    <td>${session.duration.toFixed(2)} hrs</td>
+                                    <td>${data.settings.currency} $${session.hourly_rate.toFixed(2)}</td>
+                                    <td>${data.settings.currency} $${amount.toFixed(2)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+
+                <div class="invoice-totals">
+                    <table>
+                        <tr>
+                            <td>Subtotal:</td>
+                            <td>${data.settings.currency} $${data.invoice.subtotal.toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                            <td>Tax (${(data.settings.tax_rate * 100).toFixed(0)}% GST):</td>
+                            <td>${data.settings.currency} $${data.invoice.tax_amount.toFixed(2)}</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td><strong>Total:</strong></td>
+                            <td><strong>${data.settings.currency} $${data.invoice.total_amount.toFixed(2)}</strong></td>
+                        </tr>
+                    </table>
+                </div>
+
+                ${data.invoice.notes ? `
+                    <div class="invoice-notes">
+                        <h4>Notes:</h4>
+                        <p>${escapeHtml(data.invoice.notes)}</p>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        document.getElementById('invoice-view-content').innerHTML = content;
+
+        // Show/hide mark as paid button
+        const markPaidBtn = document.getElementById('mark-paid-btn');
+        markPaidBtn.style.display = data.invoice.status === 'unpaid' ? 'inline-block' : 'none';
+
+        document.getElementById('view-invoice-modal').style.display = 'block';
+    } catch (error) {
+        console.error('Error loading invoice:', error);
+        showToast('Failed to load invoice', 'error');
+    }
+}
+
+function closeViewInvoiceModal() {
+    document.getElementById('view-invoice-modal').style.display = 'none';
+    currentInvoiceId = null;
+}
+
+async function markAsPaid() {
+    if (!currentInvoiceId) return;
+
+    try {
+        const response = await fetch(`/api/invoices/${currentInvoiceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                status: 'paid',
+                payment_date: new Date().toISOString().split('T')[0]
+            })
+        });
+
+        if (response.ok) {
+            showToast('Invoice marked as paid', 'success');
+            closeViewInvoiceModal();
+            loadInvoices();
+        } else {
+            showToast('Failed to update invoice', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating invoice:', error);
+        showToast('Failed to update invoice', 'error');
+    }
+}
+
+function downloadPDF() {
+    if (!currentInvoiceId) return;
+    window.open(`/api/invoice/${currentInvoiceId}/pdf`, '_blank');
+}
+
+async function deleteInvoice(invoiceId) {
+    if (!confirm('Are you sure you want to delete this invoice? This will unlink all associated sessions.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/invoices/${invoiceId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showToast('Invoice deleted successfully', 'success');
+            loadInvoices();
+        } else {
+            showToast('Failed to delete invoice', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting invoice:', error);
+        showToast('Failed to delete invoice', 'error');
+    }
+}
+
+// Filters
+function applyFilters() {
+    const searchTerm = document.getElementById('invoice-search').value.toLowerCase();
+    const statusFilter = document.getElementById('status-filter').value;
+
+    const filtered = invoices.filter(invoice => {
+        const matchesSearch = invoice.invoice_number.toLowerCase().includes(searchTerm) ||
+                            invoice.student_name.toLowerCase().includes(searchTerm);
+        const matchesStatus = !statusFilter || invoice.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    renderInvoices(filtered);
+}
+
+document.getElementById('invoice-search').addEventListener('input', applyFilters);
+document.getElementById('status-filter').addEventListener('change', applyFilters);
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const invoiceModal = document.getElementById('invoice-modal');
+    const viewModal = document.getElementById('view-invoice-modal');
+    if (event.target === invoiceModal) {
+        closeInvoiceModal();
+    }
+    if (event.target === viewModal) {
+        closeViewInvoiceModal();
+    }
+};
+
+// Load invoices on page load
+document.addEventListener('DOMContentLoaded', loadInvoices);
+</script>
+{% endblock %}
