@@ -7,10 +7,15 @@ import sqlite3
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import json
+import os
 
 class Database:
     def __init__(self, db_path='database/weight_gain_rpg.db'):
         self.db_path = db_path
+        # Create database directory if it doesn't exist
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
         self.init_database()
 
     def get_connection(self):
