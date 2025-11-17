@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weight Gain RPG 🎮 - Level Up Your Gains!</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- Particles.js -->
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'neon-purple': '#7C3AED',
+                        'neon-pink': '#EC4899',
+                        'neon-cyan': '#06B6D4',
+                        'neon-blue': '#3B82F6',
+                        'neon-green': '#10B981',
+                        'neon-orange': '#F97316',
+                        'neon-yellow': '#EAB308',
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-slow': 'bounce 2s infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite',
+                        'slide-up': 'slideUp 0.5s ease-out',
+                        'scale-in': 'scaleIn 0.3s ease-out',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        glow: {
+                            '0%, 100%': { boxShadow: '0 0 5px rgba(124, 58, 237, 0.5)' },
+                            '50%': { boxShadow: '0 0 20px rgba(124, 58, 237, 1)' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(100%)', opacity: 0 },
+                            '100%': { transform: 'translateY(0)', opacity: 1 },
+                        },
+                        scaleIn: {
+                            '0%': { transform: 'scale(0)', opacity: 0 },
+                            '100%': { transform: 'scale(1)', opacity: 1 },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+
+    <!-- Custom Styles -->
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%);
+        }
+
+        .gradient-bg-cyan {
+            background: linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%);
+        }
+
+        .gradient-bg-green {
+            background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+        }
+
+        .gradient-bg-orange {
+            background: linear-gradient(135deg, #F97316 0%, #EAB308 100%);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%);
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(236, 72, 153, 0.6);
+        }
+
+        .stat-bar {
+            position: relative;
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 1s ease-out;
+        }
+
+        .achievement-icon {
+            font-size: 3rem;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+
+        .rarity-common { color: #9CA3AF; }
+        .rarity-rare { color: #3B82F6; }
+        .rarity-epic { color: #A855F7; }
+        .rarity-legendary { color: #F59E0B; }
+
+        .shine {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .shine::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% { left: -100%; }
+            50%, 100% { left: 100%; }
+        }
+
+        .quest-checkbox {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border: 2px solid #7C3AED;
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .quest-checkbox:checked {
+            background: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%);
+        }
+
+        .quest-checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+        }
+
+        #particles-js {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .level-up-animation {
+            animation: scaleIn 0.5s ease-out, glow 1s ease-in-out 3;
+        }
+
+        .xp-popup {
+            animation: slideUp 0.5s ease-out, fadeOut 0.5s ease-out 2s forwards;
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateY(-50px); }
+        }
+
+        .hover-scale {
+            transition: transform 0.3s ease;
+        }
+
+        .hover-scale:hover {
+            transform: scale(1.05);
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Particle Background -->
+    <div id="particles-js"></div>
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+
+        <!-- Header -->
+        <header class="text-center mb-12 animate-slide-up">
+            <h1 class="text-6xl font-bold mb-4 gradient-text animate-float">
+                Weight Gain RPG
+            </h1>
+            <p class="text-xl text-purple-300">Level Up Your Gains! 🎮💪</p>
+        </header>
+
+        <!-- Initialization Modal (shown on first visit) -->
+        <div id="initModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+            <div class="glass-card rounded-3xl p-8 max-w-md w-full mx-4 animate-scale-in">
+                <h2 class="text-3xl font-bold mb-6 gradient-text">Start Your Journey! 🚀</h2>
+                <form id="initForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Your Name</label>
+                        <input type="text" id="username" placeholder="Enter your name"
+                               class="w-full px-4 py-3 rounded-xl bg-white bg-opacity-10 border border-purple-500 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Current Weight (kg)</label>
+                        <input type="number" id="startWeight" step="0.1" placeholder="e.g., 75.5" required
+                               class="w-full px-4 py-3 rounded-xl bg-white bg-opacity-10 border border-purple-500 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Target Weight (kg)</label>
+                        <input type="number" id="targetWeight" step="0.1" value="90" required
+                               class="w-full px-4 py-3 rounded-xl bg-white bg-opacity-10 border border-purple-500 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Target Date</label>
+                        <input type="date" id="targetDate" value="2027-07-22" required
+                               class="w-full px-4 py-3 rounded-xl bg-white bg-opacity-10 border border-purple-500 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 outline-none transition">
+                    </div>
+                    <button type="submit" class="w-full py-4 rounded-xl btn-primary text-white font-bold text-lg">
+                        BEGIN ADVENTURE! 🎮
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main Dashboard (hidden until initialized) -->
+        <div id="dashboard" class="hidden">
+
+            <!-- Hero Section - Character & Main Stats -->
+            <section class="glass-card rounded-3xl p-8 mb-8 shine">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Character Avatar -->
+                    <div class="text-center">
+                        <div class="w-48 h-48 mx-auto mb-4 relative">
+                            <div id="characterAvatar" class="w-full h-full rounded-full gradient-bg flex items-center justify-center text-8xl animate-float">
+                                💪
+                            </div>
+                            <div id="levelBadge" class="absolute -bottom-2 -right-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full w-16 h-16 flex items-center justify-center font-bold text-xl border-4 border-white shadow-lg">
+                                1
+                            </div>
+                        </div>
+                        <h2 id="userTitle" class="text-2xl font-bold gradient-text">Novice Gainer</h2>
+                        <p id="username-display" class="text-gray-400">Player</p>
+                    </div>
+
+                    <!-- Main Stats -->
+                    <div class="md:col-span-2">
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Current Weight -->
+                            <div class="glass-card rounded-2xl p-4 hover-scale">
+                                <div class="text-sm text-gray-400 mb-1">CURRENT MASS</div>
+                                <div id="currentWeight" class="text-4xl font-bold gradient-text">--</div>
+                                <div class="text-sm text-gray-400">kg</div>
+                            </div>
+
+                            <!-- Target Weight -->
+                            <div class="glass-card rounded-2xl p-4 hover-scale">
+                                <div class="text-sm text-gray-400 mb-1">TARGET GOAL</div>
+                                <div id="targetWeight" class="text-4xl font-bold text-yellow-400">90</div>
+                                <div class="text-sm text-gray-400">kg</div>
+                            </div>
+
+                            <!-- Progress -->
+                            <div class="glass-card rounded-2xl p-4 hover-scale">
+                                <div class="text-sm text-gray-400 mb-1">PROGRESS</div>
+                                <div id="progressPercent" class="text-4xl font-bold text-green-400">0%</div>
+                                <div class="text-sm text-gray-400">to goal</div>
+                            </div>
+
+                            <!-- Days Left -->
+                            <div class="glass-card rounded-2xl p-4 hover-scale">
+                                <div class="text-sm text-gray-400 mb-1">DAYS LEFT</div>
+                                <div id="daysLeft" class="text-4xl font-bold text-orange-400">--</div>
+                                <div class="text-sm text-gray-400">until July 22, 2027</div>
+                            </div>
+                        </div>
+
+                        <!-- XP Progress Bar -->
+                        <div class="mt-6">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span>Level <span id="currentLevel">1</span></span>
+                                <span><span id="currentXP">0</span> / <span id="nextLevelXP">100</span> XP</span>
+                            </div>
+                            <div class="h-6 bg-gray-700 rounded-full overflow-hidden">
+                                <div id="xpBar" class="stat-bar gradient-bg h-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="grid md:grid-cols-4 gap-4 mb-8">
+                <button onclick="showLogWeightModal()" class="glass-card rounded-2xl p-6 hover-scale text-center">
+                    <div class="text-5xl mb-2">⚖️</div>
+                    <div class="font-bold">Log Weight</div>
+                    <div class="text-sm text-gray-400">+50 XP</div>
+                </button>
+
+                <button onclick="showPhotoModal()" class="glass-card rounded-2xl p-6 hover-scale text-center">
+                    <div class="text-5xl mb-2">📸</div>
+                    <div class="font-bold">Upload Photo</div>
+                    <div class="text-sm text-gray-400">+100 XP</div>
+                </button>
+
+                <button onclick="showCalorieModal()" class="glass-card rounded-2xl p-6 hover-scale text-center">
+                    <div class="text-5xl mb-2">🍔</div>
+                    <div class="font-bold">Log Calories</div>
+                    <div class="text-sm text-gray-400">+30 XP</div>
+                </button>
+
+                <button onclick="showJournalModal()" class="glass-card rounded-2xl p-6 hover-scale text-center">
+                    <div class="text-5xl mb-2">📝</div>
+                    <div class="font-bold">Write Journal</div>
+                    <div class="text-sm text-gray-400">+40 XP</div>
+                </button>
+            </section>
+
+            <!-- Two Column Layout -->
+            <div class="grid lg:grid-cols-3 gap-8">
+
+                <!-- Left Column -->
+                <div class="lg:col-span-2 space-y-8">
+
+                    <!-- Daily Quests -->
+                    <section class="glass-card rounded-3xl p-6">
+                        <h3 class="text-2xl font-bold mb-4 flex items-center">
+                            <span class="gradient-text">Daily Quests</span>
+                            <span class="ml-2">📋</span>
+                        </h3>
+                        <div id="questList" class="space-y-3">
+                            <!-- Quests will be loaded here -->
+                        </div>
+                    </section>
+
+                    <!-- RPG Stats -->
+                    <section class="glass-card rounded-3xl p-6">
+                        <h3 class="text-2xl font-bold mb-4 flex items-center">
+                            <span class="gradient-text">Character Stats</span>
+                            <span class="ml-2">⚔️</span>
+                        </h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-red-400">STR (Strength)</span>
+                                    <span id="statSTR">50</span>
+                                </div>
+                                <div class="h-3 bg-gray-700 rounded-full overflow-hidden">
+                                    <div id="barSTR" class="stat-bar bg-red-500 h-full" style="width: 50%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-blue-400">MASS</span>
+                                    <span id="statMASS">0</span>
+                                </div>
+                                <div class="h-3 bg-gray-700 rounded-full overflow-hidden">
+                                    <div id="barMASS" class="stat-bar bg-blue-500 h-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-green-400">MOMENTUM</span>
+                                    <span id="statMOMENTUM">0</span>
+                                </div>
+                                <div class="h-3 bg-gray-700 rounded-full overflow-hidden">
+                                    <div id="barMOMENTUM" class="stat-bar bg-green-500 h-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-yellow-400">CONSISTENCY</span>
+                                    <span id="statCONSISTENCY">0</span>
+                                </div>
+                                <div class="h-3 bg-gray-700 rounded-full overflow-hidden">
+                                    <div id="barCONSISTENCY" class="stat-bar bg-yellow-500 h-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-purple-400">DEDICATION</span>
+                                    <span id="statDEDICATION">0</span>
+                                </div>
+                                <div class="h-3 bg-gray-700 rounded-full overflow-hidden">
+                                    <div id="barDEDICATION" class="stat-bar bg-purple-500 h-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-pink-400">POWER LEVEL</span>
+                                    <span id="statPOWER">0</span>
+                                </div>
+                                <div class="h-3 bg-gray-700 rounded-full overflow-hidden">
+                                    <div id="barPOWER" class="stat-bar gradient-bg h-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Weight Progress Chart -->
+                    <section class="glass-card rounded-3xl p-6">
+                        <h3 class="text-2xl font-bold mb-4 gradient-text">Weight Progress 📊</h3>
+                        <canvas id="weightChart" height="100"></canvas>
+                    </section>
+
+                </div>
+
+                <!-- Right Column -->
+                <div class="space-y-8">
+
+                    <!-- Streak Counter -->
+                    <section class="glass-card rounded-3xl p-6">
+                        <h3 class="text-2xl font-bold mb-4 gradient-text">Streak 🔥</h3>
+                        <div class="text-center">
+                            <div class="text-6xl font-bold gradient-text mb-2" id="streakCount">0</div>
+                            <div class="text-gray-400">day streak</div>
+                            <div class="mt-4 text-4xl" id="streakEmojis">🔥</div>
+                        </div>
+                    </section>
+
+                    <!-- Recent Achievements -->
+                    <section class="glass-card rounded-3xl p-6">
+                        <h3 class="text-2xl font-bold mb-4 flex items-center justify-between">
+                            <span class="gradient-text">Achievements</span>
+                            <button onclick="showAllAchievements()" class="text-sm text-purple-400 hover:text-pink-400">View All</button>
+                        </h3>
+                        <div id="achievementsList" class="space-y-3">
+                            <div class="text-center text-gray-500 py-8">
+                                Complete quests to unlock achievements! 🏆
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Required Gain Rate -->
+                    <section class="glass-card rounded-3xl p-6">
+                        <h3 class="text-xl font-bold mb-4 gradient-text">Required Rate 📈</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Per Week:</span>
+                                <span id="weeklyGain" class="font-bold text-green-400">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Per Month:</span>
+                                <span id="monthlyGain" class="font-bold text-blue-400">--</span>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Weight Modal -->
+    <div id="logWeightModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="glass-card rounded-3xl p-8 max-w-md w-full mx-4">
+            <h2 class="text-3xl font-bold mb-6 gradient-text">Log Weight ⚖️</h2>
+            <form id="logWeightForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Weight (kg)</label>
+                    <input type="number" id="weightInput" step="0.1" placeholder="e.g., 75.5" required
+                           class="w-full px-4 py-3 rounded-xl bg-white bg-opacity-10 border border-purple-500 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Notes (optional)</label>
+                    <textarea id="weightNotes" rows="3" placeholder="How are you feeling?"
+                              class="w-full px-4 py-3 rounded-xl bg-white bg-opacity-10 border border-purple-500 focus:border-pink-500 focus:ring-2 focus:ring-pink-500 outline-none transition"></textarea>
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" onclick="hideLogWeightModal()" class="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 font-bold transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 py-3 rounded-xl btn-primary text-white font-bold">
+                        Log Weight! 🎯
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Achievement Popup -->
+    <div id="achievementPopup" class="fixed top-4 right-4 z-50 hidden">
+        <div class="glass-card rounded-2xl p-6 max-w-sm animate-slide-up shine">
+            <div class="text-center">
+                <div class="text-6xl mb-2" id="achievementIcon">🏆</div>
+                <div class="text-yellow-400 font-bold text-sm mb-1">ACHIEVEMENT UNLOCKED!</div>
+                <div class="text-xl font-bold mb-1" id="achievementName">Achievement</div>
+                <div class="text-sm text-gray-400" id="achievementDesc">Description</div>
+                <div class="mt-2 text-green-400 font-bold">+<span id="achievementXP">0</span> XP</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Level Up Popup -->
+    <div id="levelUpPopup" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 hidden">
+        <div class="text-center level-up-animation">
+            <div class="text-9xl mb-4">⭐</div>
+            <div class="text-6xl font-bold gradient-text mb-4">LEVEL UP!</div>
+            <div class="text-4xl font-bold mb-2">Level <span id="newLevel">2</span></div>
+            <div class="text-2xl text-purple-400 mb-8" id="newTitle">New Title!</div>
+            <button onclick="hideLevelUpPopup()" class="px-8 py-4 rounded-xl btn-primary text-white font-bold text-xl">
+                AWESOME! 🎉
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading toast -->
+    <div id="toast" class="fixed bottom-4 right-4 glass-card rounded-xl px-6 py-4 z-50 hidden animate-slide-up">
+        <div id="toastMessage" class="font-medium"></div>
+    </div>
+
+    <!-- Main App Script -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
