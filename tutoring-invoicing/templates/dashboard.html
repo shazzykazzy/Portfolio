@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Tutoring Invoicing{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Dashboard</h2>
+    <p>Overview of your tutoring business</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon blue">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="stat-content">
+            <h3 id="monthly-revenue">Loading...</h3>
+            <p>Monthly Revenue</p>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon green">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="stat-content">
+            <h3 id="yearly-revenue">Loading...</h3>
+            <p>Yearly Revenue</p>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon orange">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="stat-content">
+            <h3 id="outstanding">Loading...</h3>
+            <p>Outstanding Payments</p>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon purple">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+        </div>
+        <div class="stat-content">
+            <h3 id="total-students">Loading...</h3>
+            <p>Active Students</p>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3>Recent Sessions</h3>
+            <a href="/sessions" class="btn btn-sm">View All</a>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Student</th>
+                            <th>Subject</th>
+                            <th>Duration</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-sessions">
+                        <tr>
+                            <td colspan="5" class="text-center">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Unpaid Invoices</h3>
+            <span class="badge" id="unpaid-count">0</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">You have <strong id="unpaid-invoices-text">0</strong> unpaid invoices totaling <strong id="outstanding-amount">$0.00</strong></p>
+            <a href="/invoices" class="btn btn-primary btn-block">Manage Invoices</a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load dashboard data
+async function loadDashboard() {
+    try {
+        const response = await fetch('/api/dashboard-stats');
+        const data = await response.json();
+
+        // Update stats
+        const currency = 'NZD $';
+        document.getElementById('monthly-revenue').textContent = `${currency}${data.monthly_revenue.toFixed(2)}`;
+        document.getElementById('yearly-revenue').textContent = `${currency}${data.yearly_revenue.toFixed(2)}`;
+        document.getElementById('outstanding').textContent = `${currency}${data.outstanding.toFixed(2)}`;
+        document.getElementById('total-students').textContent = data.total_students;
+        document.getElementById('unpaid-count').textContent = data.unpaid_invoices_count;
+        document.getElementById('unpaid-invoices-text').textContent = data.unpaid_invoices_count;
+        document.getElementById('outstanding-amount').textContent = `${currency}${data.outstanding.toFixed(2)}`;
+
+        // Update recent sessions table
+        const sessionsBody = document.getElementById('recent-sessions');
+        if (data.recent_sessions.length === 0) {
+            sessionsBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No recent sessions</td></tr>';
+        } else {
+            sessionsBody.innerHTML = data.recent_sessions.map(session => {
+                const amount = session.duration * session.hourly_rate;
+                return `
+                    <tr>
+                        <td>${formatDate(session.session_date)}</td>
+                        <td>${escapeHtml(session.student_name)}</td>
+                        <td>${escapeHtml(session.subject || 'N/A')}</td>
+                        <td>${session.duration.toFixed(2)} hrs</td>
+                        <td>${currency}${amount.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        showToast('Failed to load dashboard data', 'error');
+    }
+}
+
+// Helper functions
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-NZ', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

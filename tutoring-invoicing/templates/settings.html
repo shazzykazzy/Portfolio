@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Tutoring Invoicing{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Settings</h2>
+    <p>Configure your business details and preferences</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Business Information</h3>
+    </div>
+    <div class="card-body">
+        <form id="settings-form" onsubmit="saveSettings(event)">
+            <div class="form-group">
+                <label for="business-name">Business Name *</label>
+                <input type="text" id="business-name" class="form-control" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="business-email">Email</label>
+                    <input type="email" id="business-email" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="business-phone">Phone</label>
+                    <input type="tel" id="business-phone" class="form-control">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="business-address">Business Address</label>
+                <textarea id="business-address" class="form-control" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="payment-details">Payment Details</label>
+                <textarea id="payment-details" class="form-control" rows="4"
+                          placeholder="Bank account details, payment instructions, etc."></textarea>
+                <small class="form-text">This information will appear on invoices</small>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="tax-rate">Tax Rate (GST)</label>
+                    <div class="input-group">
+                        <input type="number" id="tax-rate" class="form-control" step="0.01" min="0" max="1">
+                        <div class="input-group-append">
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+                    <small class="form-text">Enter as decimal (e.g., 0.15 for 15%)</small>
+                </div>
+                <div class="form-group">
+                    <label for="currency">Currency</label>
+                    <select id="currency" class="form-control">
+                        <option value="NZD">NZD - New Zealand Dollar</option>
+                        <option value="AUD">AUD - Australian Dollar</option>
+                        <option value="USD">USD - US Dollar</option>
+                        <option value="GBP">GBP - British Pound</option>
+                        <option value="EUR">EUR - Euro</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Database Information</h3>
+    </div>
+    <div class="card-body">
+        <p><strong>Database Location:</strong> tutoring.db</p>
+        <p class="text-muted">
+            Your data is stored locally in an SQLite database file.
+            Make sure to back up this file regularly to prevent data loss.
+        </p>
+        <div class="alert alert-info">
+            <strong>Backup Tip:</strong> Copy the tutoring.db file to a safe location regularly.
+            You can also use the export features in the Reports section to export your data to CSV.
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>About</h3>
+    </div>
+    <div class="card-body">
+        <h4>Tutoring Invoice Manager</h4>
+        <p>Version 1.0.0</p>
+        <p>A simple, professional invoicing application for tutoring businesses.</p>
+        <p class="text-muted">
+            Built with Flask, SQLite, and modern web technologies.
+        </p>
+    </div>
+</div>
+
+<script>
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/settings');
+        const settings = await response.json();
+
+        document.getElementById('business-name').value = settings.business_name;
+        document.getElementById('business-email').value = settings.business_email || '';
+        document.getElementById('business-phone').value = settings.business_phone || '';
+        document.getElementById('business-address').value = settings.business_address || '';
+        document.getElementById('payment-details').value = settings.payment_details || '';
+        document.getElementById('tax-rate').value = settings.tax_rate;
+        document.getElementById('currency').value = settings.currency;
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        showToast('Failed to load settings', 'error');
+    }
+}
+
+async function saveSettings(event) {
+    event.preventDefault();
+
+    const settingsData = {
+        business_name: document.getElementById('business-name').value,
+        business_email: document.getElementById('business-email').value,
+        business_phone: document.getElementById('business-phone').value,
+        business_address: document.getElementById('business-address').value,
+        payment_details: document.getElementById('payment-details').value,
+        tax_rate: parseFloat(document.getElementById('tax-rate').value),
+        currency: document.getElementById('currency').value
+    };
+
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settingsData)
+        });
+
+        if (response.ok) {
+            showToast('Settings saved successfully', 'success');
+        } else {
+            showToast('Failed to save settings', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        showToast('Failed to save settings', 'error');
+    }
+}
+
+// Load settings on page load
+document.addEventListener('DOMContentLoaded', loadSettings);
+</script>
+{% endblock %}

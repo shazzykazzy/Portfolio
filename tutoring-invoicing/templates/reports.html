@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Tutoring Invoicing{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Reports & Analytics</h2>
+</div>
+
+<div class="reports-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3>Income Summary</h3>
+            <select id="period-select" class="form-control" onchange="loadIncomeReport()">
+                <option value="month">By Month</option>
+                <option value="year">By Year</option>
+            </select>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th>Invoices</th>
+                            <th>Subtotal</th>
+                            <th>Tax</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="income-report">
+                        <tr>
+                            <td colspan="5" class="text-center">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-primary" onclick="exportReport('income')">Export to CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Outstanding Invoices</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Student</th>
+                            <th>Due Date</th>
+                            <th>Amount</th>
+                            <th>Days Overdue</th>
+                        </tr>
+                    </thead>
+                    <tbody id="outstanding-report">
+                        <tr>
+                            <td colspan="5" class="text-center">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <p><strong>Total Outstanding:</strong> <span id="total-outstanding">NZD $0.00</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Export Data</h3>
+    </div>
+    <div class="card-body">
+        <p>Export your data to CSV format for use in spreadsheets or accounting software.</p>
+        <div class="export-buttons">
+            <button class="btn btn-primary" onclick="exportReport('income')">
+                Export All Invoices
+            </button>
+            <button class="btn btn-primary" onclick="exportReport('sessions')">
+                Export All Sessions
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadIncomeReport() {
+    const period = document.getElementById('period-select').value;
+
+    try {
+        const response = await fetch(`/api/reports/income?period=${period}`);
+        const data = await response.json();
+
+        const tbody = document.getElementById('income-report');
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No data available</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(row => `
+            <tr>
+                <td>${escapeHtml(row.period)}</td>
+                <td>${row.invoice_count}</td>
+                <td>NZD $${(row.subtotal || 0).toFixed(2)}</td>
+                <td>NZD $${(row.tax || 0).toFixed(2)}</td>
+                <td><strong>NZD $${(row.total || 0).toFixed(2)}</strong></td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading income report:', error);
+        showToast('Failed to load income report', 'error');
+    }
+}
+
+async function loadOutstandingReport() {
+    try {
+        const response = await fetch('/api/reports/outstanding');
+        const data = await response.json();
+
+        const tbody = document.getElementById('outstanding-report');
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No outstanding invoices</td></tr>';
+            document.getElementById('total-outstanding').textContent = 'NZD $0.00';
+            return;
+        }
+
+        let totalOutstanding = 0;
+        const today = new Date();
+
+        tbody.innerHTML = data.map(invoice => {
+            totalOutstanding += invoice.total_amount;
+            const dueDate = new Date(invoice.due_date);
+            const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+            const overdueClass = daysOverdue > 0 ? 'text-danger' : '';
+
+            return `
+                <tr class="${overdueClass}">
+                    <td>${escapeHtml(invoice.invoice_number)}</td>
+                    <td>${escapeHtml(invoice.student_name)}</td>
+                    <td>${formatDate(invoice.due_date)}</td>
+                    <td>NZD $${invoice.total_amount.toFixed(2)}</td>
+                    <td>${daysOverdue > 0 ? `${daysOverdue} days` : 'Not overdue'}</td>
+                </tr>
+            `;
+        }).join('');
+
+        document.getElementById('total-outstanding').textContent = `NZD $${totalOutstanding.toFixed(2)}`;
+    } catch (error) {
+        console.error('Error loading outstanding report:', error);
+        showToast('Failed to load outstanding report', 'error');
+    }
+}
+
+function exportReport(type) {
+    window.location.href = `/api/reports/export-csv?type=${type}`;
+    showToast(`Exporting ${type} report...`, 'success');
+}
+
+// Load reports on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadIncomeReport();
+    loadOutstandingReport();
+});
+</script>
+{% endblock %}
