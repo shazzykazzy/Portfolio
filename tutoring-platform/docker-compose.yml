@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: tutoring_db
+    environment:
+      POSTGRES_DB: tutoring_db
+      POSTGRES_USER: tutoring_user
+      POSTGRES_PASSWORD: tutoring_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - tutoring_network
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: tutoring_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - tutoring_network
+
+  # Django Backend
+  backend:
+    build: ./backend
+    container_name: tutoring_backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - tutoring_network
+
+  # Celery Worker
+  celery:
+    build: ./backend
+    container_name: tutoring_celery
+    command: celery -A tutoring worker -l info
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - db
+      - redis
+      - backend
+    networks:
+      - tutoring_network
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build: ./backend
+    container_name: tutoring_celery_beat
+    command: celery -A tutoring beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - db
+      - redis
+      - backend
+    networks:
+      - tutoring_network
+
+  # React Frontend
+  frontend:
+    build: ./frontend
+    container_name: tutoring_frontend
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - tutoring_network
+
+  # Nginx (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: tutoring_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - static_volume:/static
+      - media_volume:/media
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - tutoring_network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+
+networks:
+  tutoring_network:
+    driver: bridge
